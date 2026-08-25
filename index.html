@@ -299,9 +299,26 @@ function processSprite(img){
   for(let py=0;py<h;py++)for(let px=0;px<w;px++)
     if(d[(py*w+px)*4+3]>10){if(px<mnx)mnx=px;if(px>mxx)mxx=px;if(py<mny)mny=py;if(py>mxy)mxy=py;}
   if(mxx<mnx)return{c:img,w,h};
-  const cw=mxx-mnx+1,ch=mxy-mny+1,o=document.createElement('canvas');o.width=cw;o.height=ch;
+  const cw=mxx-mnx+1,ch=mxy-mny+1;
+  let o=document.createElement('canvas');o.width=cw;o.height=ch;
   o.getContext('2d').putImageData(im,0,0,mnx,mny,cw,ch);
+  
+  // ★ 自動降採樣：限制最大高度為 300px（Boss 110px * 3倍DPR = 330，300已足夠）
+  const MAX_H = 300;
+  if(ch > MAX_H){
+    const scale = MAX_H / ch;
+    const nw = Math.round(cw * scale);
+    const nh = MAX_H;
+    const resized = document.createElement('canvas');
+    resized.width = nw; resized.height = nh;
+    const rx = resized.getContext('2d');
+    rx.imageSmoothingEnabled = true;
+    rx.imageSmoothingQuality = 'high';
+    rx.drawImage(o, 0, 0, nw, nh);
+    return {c:resized, w:nw, h:nh};
+  }
   return{c:o,w:cw,h:ch};
+}
 }
 const Assets={map:{},
   load(n,src){const i=new Image();i.onload=()=>this.map[n]=processSprite(i);i.onerror=()=>this.map[n]=null;i.src=src;},
