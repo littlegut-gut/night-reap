@@ -1,3 +1,5 @@
+[![遊玩](https://img.shields.io/badge/PLAY-你的帳號.github.io%2Fnight--reap-7cf7e0)](https://你的帳號.github.io/night-reap/)
+
 \# 🌙 夜刈 NIGHT REAP
 
 
