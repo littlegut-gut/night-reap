@@ -1,4 +1,4 @@
-[![遊玩](https://img.shields.io/badge/PLAY-littlegut.github.io%2Fnight--reap-7cf7e0)](https://littlegut.github.io/night-reap/)
+[![遊玩](https://img.shields.io/badge/PLAY-littlegut-gut.github.io%2Fnight--reap-7cf7e0)](https://littlegut-gut.github.io/night-reap/)
 
 \# 🌙 夜刈 NIGHT REAP
 
