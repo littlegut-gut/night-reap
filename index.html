@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0b100e">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<title>夜刈 NIGHT REAP — 割草生存 v1.0</title>
+<title>夜刈 NIGHT REAP — 割草生存 v1.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
@@ -92,11 +92,11 @@
   <button id="btnBgm" title="音樂">♬</button>
   <button id="btnSfx" title="音效">♪</button>
 </div>
-<div id="ver">NIGHT REAP v1.0</div>
+<div id="ver">NIGHT REAP v1.1</div>
 
 <div id="menu" class="overlay">
   <div class="title">夜刈</div>
-  <div class="subtitle">NIGHT REAP · v1.0</div>
+  <div class="subtitle">NIGHT REAP · v1.1</div>
   <div class="tag">黑夜很長，鐮刀很快。</div>
   <div class="chips">
     <span class="chip">📱 滑動＝移動</span><span class="chip">⌨️ WASD／方向鍵</span>
@@ -138,7 +138,7 @@
 
 <script>
 'use strict';
-console.log('%cNIGHT REAP v1.0 loaded','color:#7cf7e0;font-weight:bold');
+console.log('%cNIGHT REAP v1.1 loaded','color:#7cf7e0;font-weight:bold');
 const DEBUG=new URLSearchParams(location.search).has('debug');
 /* =====================================================================
    0) CONFIG
@@ -269,7 +269,7 @@ const Au={ctx:null,sfxGain:null,musGain:null,bgmMode:null,bgmTried:false,audioEl
 };
 
 /* =====================================================================
-   3) ASSETS —— 自動去背裁邊＋自動載入
+   3) ASSETS —— 自動去背裁邊＋自動降採樣＋自動載入
 ===================================================================== */
 function processSprite(img){
   const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
@@ -302,23 +302,17 @@ function processSprite(img){
   const cw=mxx-mnx+1,ch=mxy-mny+1;
   let o=document.createElement('canvas');o.width=cw;o.height=ch;
   o.getContext('2d').putImageData(im,0,0,mnx,mny,cw,ch);
-  
-  // ★ 自動降採樣：限制最大高度為 300px（Boss 110px * 3倍DPR = 330，300已足夠）
-  const MAX_H = 300;
-  if(ch > MAX_H){
-    const scale = MAX_H / ch;
-    const nw = Math.round(cw * scale);
-    const nh = MAX_H;
-    const resized = document.createElement('canvas');
-    resized.width = nw; resized.height = nh;
-    const rx = resized.getContext('2d');
-    rx.imageSmoothingEnabled = true;
-    rx.imageSmoothingQuality = 'high';
-    rx.drawImage(o, 0, 0, nw, nh);
-    return {c:resized, w:nw, h:nh};
+  /* ★ 自動降採樣：記憶體中貼圖最高 300px（Boss 110px×3倍DPR 足夠），手機不卡 */
+  const MAX_H=300;
+  if(ch>MAX_H){
+    const scale=MAX_H/ch,nw=Math.round(cw*scale),nh=MAX_H;
+    const resized=document.createElement('canvas');resized.width=nw;resized.height=nh;
+    const rx=resized.getContext('2d');
+    rx.imageSmoothingEnabled=true;rx.imageSmoothingQuality='high';
+    rx.drawImage(o,0,0,nw,nh);
+    return{c:resized,w:nw,h:nh};
   }
   return{c:o,w:cw,h:ch};
-}
 }
 const Assets={map:{},
   load(n,src){const i=new Image();i.onload=()=>this.map[n]=processSprite(i);i.onerror=()=>this.map[n]=null;i.src=src;},
@@ -1124,7 +1118,6 @@ function drawHUD(){
     ctx.textAlign='left';ctx.font='8px "Press Start 2P",monospace';ctx.fillStyle='#ff8d9a';
     ctx.fillText(Math.ceil(player.magT)+'s',236,top+9);}
   if(player.shield>0){ctx.save();ctx.translate(278,top+8);ctx.scale(.7,.7);drawShieldIcon();ctx.restore();}
-  /* 技能家族列 */
   ctx.font='11px "Noto Sans TC",sans-serif';
   const famLv={};
   for(const u of UPGRADES)if(u.lv>0)famLv[u.fam]=(famLv[u.fam]||0)+u.lv;
@@ -1147,7 +1140,6 @@ function drawHUD(){
   ctx.font='13px "Press Start 2P",monospace';ctx.fillStyle='#ffe08a';
   ctx.fillText(G.kills,vw-16,top+20);
   const by=vh-30,BH=12;
-  /* Boss 血條（XP 條上方） */
   const boss=enemies.find(e=>e.boss);
   if(boss){const bw=Math.min(vw-80,520),bx=(vw-bw)/2,byy=by-24;
     ctx.textAlign='center';ctx.font='900 12px "Noto Sans TC",sans-serif';
