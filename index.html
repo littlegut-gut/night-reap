@@ -274,71 +274,43 @@ const Au={ctx:null,sfxGain:null,musGain:null,bgmMode:null,bgmTried:false,audioEl
 function processSprite(img,name){
   try{
     const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
-    if(!w||!h)throw new Error('empty image');
+    if(!w||!h)throw new Error('empty');
     const c=document.createElement('canvas');c.width=w;c.height=h;
     const x=c.getContext('2d');x.drawImage(img,0,0);
     let im;
     try{im=x.getImageData(0,0,w,h);}
-    catch(e){console.warn('[assets]',name,'getImageData 失敗→用原圖');return{c:img,w,h};}
+    catch(e){console.warn('[assets]',name,'getImageData 失敗→原圖');return{c:img,w,h};}
     const d=im.data;
-    const corners=[[0,0],[w-1,0],[0,h-1],[w-1,h-1]];
-    /* 只有「四角不透明」(白底圖) 才去背；透明 PNG 直接跳過，邊緣零損傷 */
-    if(corners.every(([px,py])=>d[(py*w+px)*4+3]>128)){
-      let cr=0,cg=0,cb=0;
-      for(const [px,py] of corners){const i=(py*w+px)*4;cr+=d[i];cg+=d[i+1];cb+=d[i+2];}
-      cr/=4;cg/=4;cb/=4;
-      const tol=60; /* 調低：不再誤吃白色貼紙邊/淺色反鋸齒 */
-      const isBg=i=>Math.abs(d[i]-cr)+Math.abs(d[i+1]-cg)+Math.abs(d[i+2]-cb)<tol;
-      const seen=new Uint8Array(w*h),st=[];
-      const push=(px,py)=>{const q=py*w+px;
-        if(!seen[q]&&isBg(q*4)){seen[q]=1;st.push(q);}};
-      for(let px=0;px<w;px++){push(px,0);push(px,h-1);}
-      for(let py=0;py<h;py++){push(0,py);push(w-1,py);}
-      while(st.length){const q=st.pop();d[q*4+3]=0;
-        const px=q%w,py=(q/w)|0;
-        if(px>0)push(px-1,py);if(px<w-1)push(px+1,py);
-        if(py>0)push(px,py-1);if(py<h-1)push(px,py+1);}
-    }
-    /* 裁透明邊：alpha>0 全保留（舊版 >10 會削掉半透明邊） */
+    /* 只裁透明邊（alpha>0 全保留，反鋸齒不削）；不做去背 */
     let mnx=w,mny=h,mxx=-1,mxy=-1;
     for(let py=0;py<h;py++)for(let px=0;px<w;px++)
       if(d[(py*w+px)*4+3]>0){if(px<mnx)mnx=px;if(px>mxx)mxx=px;if(py<mny)mny=py;if(py>mxy)mxy=py;}
-    if(mxx<0){console.warn('[assets]',name,'全透明→用原圖');return{c:img,w,h};}
+    if(mxx<0){console.warn('[assets]',name,'全透明→原圖');return{c:img,w,h};}
     const cw=mxx-mnx+1,ch=mxy-mny+1;
     const o=document.createElement('canvas');o.width=cw;o.height=ch;
     o.getContext('2d').putImageData(im,0,0,mnx,mny,cw,ch);
-    /* 降採樣：記憶體中最高 300px */
-    const MAX_H=300;
+    let out=o,ow=cw,oh=ch;
+    const MAX_H=300; /* 降採樣：記憶體最高 300px */
     if(ch>MAX_H){
       const nw=Math.max(1,Math.round(cw*(MAX_H/ch)));
       const r2=document.createElement('canvas');r2.width=nw;r2.height=MAX_H;
       const rx=r2.getContext('2d');
       rx.imageSmoothingEnabled=true;rx.imageSmoothingQuality='high';
       rx.drawImage(o,0,0,nw,MAX_H);
-      console.log('[assets]',name,`${w}x${h}→${nw}x${MAX_H}`);
-      return{c:r2,w:nw,h:MAX_H};
+      out=r2;ow=nw;oh=MAX_H;
     }
-    console.log('[assets]',name,`${w}x${h}→${cw}x${ch}`);
-    return{c:o,w:cw,h:ch};
+    /* 空圖驗證：處理後幾乎全透明→回退原圖 */
+    const chk=out.getContext('2d').getImageData(0,0,ow,oh).data;
+    let sum=0;for(let i=3;i<chk.length;i+=97)sum+=chk[i];
+    if(sum<255){console.warn('[assets]',name,'處理後為空→原圖');return{c:img,w,h};}
+    console.log('[assets]',name,`${w}x${h}→${ow}x${oh}`);
+    return{c:out,w:ow,h:oh};
   }catch(e){
-    console.warn('[assets]',name,'處理異常→用原圖',e);
+    console.warn('[assets]',name,'異常→原圖',e);
     return{c:img,w:img.naturalWidth||img.width,h:img.naturalHeight||img.height};
   }
 }
-const Assets={map:{},missing:[],
-  load(n,src){const i=new Image();
-    i.onload=()=>{this.map[n]=processSprite(i,n);};
-    i.onerror=()=>{this.map[n]=null;this.missing.push(n);
-      console.error('[assets] 載入失敗(檢查檔名/路徑):',src);};
-    i.src=src;},
-  get(n){return this.map[n]||null;},
-  white(n){const s=this.get(n);if(!s)return null;
-    if(!s._w){const c=document.createElement('canvas');c.width=s.w;c.height=s.h;
-      const x=c.getContext('2d');x.drawImage(s.c,0,0);
-      x.globalCompositeOperation='source-in';x.fillStyle='#fff';x.fillRect(0,0,s.w,s.h);
-      s._w={c,w:s.w,h:s.h};}
-    return s._w;}};
-const SPR_MANIFEST=['player','player_idle','player_hurt','player_win','player_attack','player_attack2'];
+
 function autoLoadSprites(){
   const keys=new Set(SPR_MANIFEST);
   for(const k in ETYPES)if(ETYPES[k].spr){
