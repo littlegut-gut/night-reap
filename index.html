@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0b100e">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<title>夜刈 NIGHT REAP — 割草生存 v1.1</title>
+<title>夜刈 NIGHT REAP — 割草生存 v1.2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
@@ -92,11 +92,11 @@
   <button id="btnBgm" title="音樂">♬</button>
   <button id="btnSfx" title="音效">♪</button>
 </div>
-<div id="ver">NIGHT REAP v1.1</div>
+<div id="ver">NIGHT REAP v1.2</div>
 
 <div id="menu" class="overlay">
   <div class="title">夜刈</div>
-  <div class="subtitle">NIGHT REAP · v1.1</div>
+  <div class="subtitle">NIGHT REAP · v1.2</div>
   <div class="tag">黑夜很長，鐮刀很快。</div>
   <div class="chips">
     <span class="chip">📱 滑動＝移動</span><span class="chip">⌨️ WASD／方向鍵</span>
@@ -105,6 +105,7 @@
     <span class="chip">🕸 蛛網減速</span><span class="chip">☠ 十字极光</span><span class="chip">👑 3:00 Boss</span>
   </div>
   <div class="bestline" id="bestline"></div>
+  <div class="bestline" id="assetline" style="animation:none;font-size:12px"></div>
   <button class="gbtn" id="btnStart">開始收割</button>
 </div>
 
@@ -138,7 +139,7 @@
 
 <script>
 'use strict';
-console.log('%cNIGHT REAP v1.1 loaded','color:#7cf7e0;font-weight:bold');
+console.log('%cNIGHT REAP v1.2 loaded','color:#7cf7e0;font-weight:bold');
 const DEBUG=new URLSearchParams(location.search).has('debug');
 /* =====================================================================
    0) CONFIG
@@ -269,60 +270,75 @@ const Au={ctx:null,sfxGain:null,musGain:null,bgmMode:null,bgmTried:false,audioEl
 };
 
 /* =====================================================================
-   3) ASSETS —— 自動去背裁邊＋自動降採樣＋自動載入
+   3) ASSETS —— v1.2 防彈管線：先縮放→再裁透明邊→任何異常回退原圖
 ===================================================================== */
-function processSprite(img,name){
+function trimCanvas(cv){
   try{
-    const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
-    if(!w||!h)throw new Error('empty');
-    const c=document.createElement('canvas');c.width=w;c.height=h;
-    const x=c.getContext('2d');x.drawImage(img,0,0);
-    let im;
-    try{im=x.getImageData(0,0,w,h);}
-    catch(e){console.warn('[assets]',name,'getImageData 失敗→原圖');return{c:img,w,h};}
-    const d=im.data;
-    /* 只裁透明邊（alpha>0 全保留，反鋸齒不削）；不做去背 */
+    const w=cv.width,h=cv.height;
+    const d=cv.getContext('2d').getImageData(0,0,w,h).data;
     let mnx=w,mny=h,mxx=-1,mxy=-1;
     for(let py=0;py<h;py++)for(let px=0;px<w;px++)
       if(d[(py*w+px)*4+3]>0){if(px<mnx)mnx=px;if(px>mxx)mxx=px;if(py<mny)mny=py;if(py>mxy)mxy=py;}
-    if(mxx<0){console.warn('[assets]',name,'全透明→原圖');return{c:img,w,h};}
+    if(mxx<0)return null;
     const cw=mxx-mnx+1,ch=mxy-mny+1;
     const o=document.createElement('canvas');o.width=cw;o.height=ch;
-    o.getContext('2d').putImageData(im,0,0,mnx,mny,cw,ch);
-    let out=o,ow=cw,oh=ch;
-    const MAX_H=300; /* 降採樣：記憶體最高 300px */
-    if(ch>MAX_H){
-      const nw=Math.max(1,Math.round(cw*(MAX_H/ch)));
-      const r2=document.createElement('canvas');r2.width=nw;r2.height=MAX_H;
-      const rx=r2.getContext('2d');
-      rx.imageSmoothingEnabled=true;rx.imageSmoothingQuality='high';
-      rx.drawImage(o,0,0,nw,MAX_H);
-      out=r2;ow=nw;oh=MAX_H;
+    o.getContext('2d').drawImage(cv,mnx,mny,cw,ch,0,0,cw,ch);
+    return{c:o,w:cw,h:ch};
+  }catch(e){return null;}
+}
+function processSprite(img,name){
+  const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+  if(!w||!h)return{c:img,w:w||1,h:h||1};
+  try{
+    const MAX_H=300;
+    let cv;
+    if(h>MAX_H){ /* 大圖：先高品質縮到 300px */
+      const nw=Math.max(1,Math.round(w*(MAX_H/h)));
+      cv=document.createElement('canvas');cv.width=nw;cv.height=MAX_H;
+      const sx=cv.getContext('2d');
+      sx.imageSmoothingEnabled=true;sx.imageSmoothingQuality='high';
+      sx.drawImage(img,0,0,nw,MAX_H);
+    }else{       /* 小圖：直接轉 canvas */
+      cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0);
     }
-    /* 空圖驗證：處理後幾乎全透明→回退原圖 */
-    const chk=out.getContext('2d').getImageData(0,0,ow,oh).data;
-    let sum=0;for(let i=3;i<chk.length;i+=97)sum+=chk[i];
-    if(sum<255){console.warn('[assets]',name,'處理後為空→原圖');return{c:img,w,h};}
-    console.log('[assets]',name,`${w}x${h}→${ow}x${oh}`);
-    return{c:out,w:ow,h:oh};
+    const t=trimCanvas(cv);
+    if(t){console.log('[assets]',name,`${w}x${h}→${t.w}x${t.h}`);return t;}
+    console.warn('[assets]',name,'trim 失敗→用縮放圖');
+    return{c:cv,w:cv.width,h:cv.height};
   }catch(e){
     console.warn('[assets]',name,'異常→原圖',e);
-    return{c:img,w:img.naturalWidth||img.width,h:img.naturalHeight||img.height};
+    return{c:img,w,h};
   }
 }
-
+const Assets={map:{},missing:[],
+  load(n,src){const i=new Image();
+    i.onload=()=>{this.map[n]=processSprite(i,n);};
+    i.onerror=()=>{this.map[n]=null;this.missing.push(n);
+      console.error('[assets] 載入失敗(404? 檔名大小寫?):',src);};
+    i.src=src;},
+  get(n){return this.map[n]||null;},
+  white(n){const s=this.get(n);if(!s)return null;
+    if(!s._w){const c=document.createElement('canvas');c.width=s.w;c.height=s.h;
+      const x=c.getContext('2d');x.drawImage(s.c,0,0);
+      x.globalCompositeOperation='source-in';x.fillStyle='#fff';x.fillRect(0,0,s.w,s.h);
+      s._w={c,w:s.w,h:s.h};}
+    return s._w;}};
+const SPR_MANIFEST=['player','player_idle','player_hurt','player_win','player_attack','player_attack2'];
+let SPR_KEYS=[];
 function autoLoadSprites(){
   const keys=new Set(SPR_MANIFEST);
   for(const k in ETYPES)if(ETYPES[k].spr){
     keys.add(ETYPES[k].spr);keys.add(ETYPES[k].spr+'_attack');keys.add(ETYPES[k].spr+'_hurt');}
-  keys.forEach(k=>Assets.load(k,`assets/${k}.png`));
-  setTimeout(()=>{if(Assets.missing.length)
-    console.error('[assets] 缺少檔案:',Assets.missing.join(', '));},1500);
-}function autoLoadSprites(){
-  const keys=new Set(SPR_MANIFEST);
-  for(const k in ETYPES)if(ETYPES[k].spr){
-    keys.add(ETYPES[k].spr);keys.add(ETYPES[k].spr+'_attack');keys.add(ETYPES[k].spr+'_hurt');}
-  keys.forEach(k=>Assets.load(k,`assets/${k}.png`));
+  SPR_KEYS=[...keys];
+  SPR_KEYS.forEach(k=>Assets.load(k,`assets/${k}.png`));
+  setTimeout(()=>{ /* 選單直接顯示素材狀態，不用 F12 */
+    const missing=SPR_KEYS.filter(k=>!Assets.get(k));
+    const el=document.getElementById('assetline');
+    if(el){
+      el.textContent=missing.length?`⚠ 缺少素材：${missing.join('、')}`:`✓ 素材齊備 ${SPR_KEYS.length} 張`;
+      el.style.color=missing.length?'#ff8d9a':'#7cf7e0';}
+  },2500);
 }
 
 /* =====================================================================
@@ -916,7 +932,12 @@ function update(dt){
 /* =====================================================================
    10) DRAW
 ===================================================================== */
-function drawSprite(s,h){const r=h/s.h,w=s.w*r;ctx.drawImage(s.c,-w/2,-h/2,w,h);}
+function drawSprite(s,h){
+  if(!s||!s.c||!s.w||!s.h)return false;
+  const r=h/s.h,w=s.w*r;
+  ctx.drawImage(s.c,-w/2,-h/2,w,h);
+  return true;
+}
 
 function drawReaper(){
   const q=player.swing>0?1-player.swing/.22:0;
@@ -1209,12 +1230,14 @@ function draw(){
       ctx.translate(e.x+(e.state==='windup'?rand(-1.5,1.5):0),
                     e.y+Math.sin(G.time*5+e.ph)*2+(e.state==='windup'?rand(-1.5,1.5):0));
       const spr=e.spr?Assets.get(e.spr):null;
-      if(spr){ctx.scale(e.fx||1,1);
+      let ok=false;
+      if(spr){
         let pose=spr;
         if(e.flash>0)pose=Assets.get(e.spr+'_hurt')||Assets.white(e.spr)||spr;
         else if(e.state==='windup')pose=Assets.get(e.spr+'_attack')||spr;
-        drawSprite(pose,e.size);
-      }else drawBat(e);
+        ok=drawSprite(pose,e.size);
+      }
+      if(!ok)drawBat(e);
       ctx.restore();
       if(!e.boss&&e.hp<e.maxHp){const w=e.r*1.7;
         ctx.fillStyle='rgba(0,0,0,.5)';ctx.fillRect(e.x-w/2,e.y-e.r-14,w,3);
@@ -1236,7 +1259,7 @@ function draw(){
         if(moving)ctx.rotate(Math.sin(p.bob)*.05);
         spr=(moving?Assets.get('player'):null)||Assets.get('player_idle')||Assets.get('player');
       }
-      if(spr)drawSprite(spr,46);else drawReaper();
+      if(!spr||!drawSprite(spr,46))drawReaper();
       if(p.shield>0){ctx.strokeStyle=`rgba(124,247,224,${.45+.2*Math.sin(G.time*6)})`;
         ctx.lineWidth=2;ctx.fillStyle='rgba(124,247,224,.07)';
         ctx.beginPath();ctx.arc(0,-6,22,0,TAU);ctx.fill();ctx.stroke();}
