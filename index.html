@@ -637,7 +637,7 @@ function spawnEnemy(type,opts={}){
     state:'chase',stT:rand(1,2),cx:0,cy:0,spinCd:0,
     atkT:3,sumT:8,armT:0,tick:0,
     vx:0,vy:0,sS:rand(-1,1),orb:rand(46,110),
-    flash:0,kx:0,ky:0,ph:rand(TAU),fx:1,dead:false});
+    swingT:0,flash:0,kx:0,ky:0,ph:rand(TAU),fx:1,dead:false});
 }
 function updateDirector(dt){
   for(const a of DIRECTOR.ambient){
@@ -821,6 +821,7 @@ function update(dt){
 
   for(const e of enemies){
     e.flash=Math.max(0,e.flash-dt);e.spinCd=Math.max(0,e.spinCd-dt);
+    e.swingT=Math.max(0,(e.swingT||0)-dt);
     const dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy)||1;
     const ux=dx/d,uy=dy/d,pxv=-uy,pyv=ux;
     let tx=0,ty=0;
@@ -869,7 +870,7 @@ function update(dt){
       const dir=d>260?1:(d<180?-1:0);
       tx=(ux*dir+pxv*e.sS)*e.spd;ty=(uy*dir+pyv*e.sS)*e.spd;
       e.stT-=dt;
-      if(e.stT<=0&&d<430){e.stT=rand(2,2.8);
+      if(e.stT<=0&&d<430){e.stT=rand(2,2.8);e.swingT=.4;
         webs.push({x:player.x+Input.x*70,y:player.y+Input.y*70,r:46,t:0,life:7});
         Au.sfx('web');}
     }else if(e.type==='sins'){
@@ -1234,7 +1235,8 @@ function draw(){
       if(spr){
         let pose=spr;
         if(e.flash>0)pose=Assets.get(e.spr+'_hurt')||Assets.white(e.spr)||spr;
-        else if(e.state==='windup')pose=Assets.get(e.spr+'_attack')||spr;
+        else if(e.state==='windup'||e.state==='telegraph'||e.state==='beam'||e.swingT>0)
+          pose=Assets.get(e.spr+'_attack')||spr;
         ok=drawSprite(pose,e.size);
       }
       if(!ok)drawBat(e);
