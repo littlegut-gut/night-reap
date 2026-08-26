@@ -887,6 +887,21 @@ function update(dt){
         tx=(ux*dir+pxv*e.sS*.6)*e.spd;ty=(uy*dir+pyv*e.sS*.6)*e.spd;
         if(e.stT<=0&&d<560){e.state='telegraph';e.stT=.8;Au.sfx('warn');}
       }
+    }else if(e.type==='bat'){ /* 小蝠俯衝：蓄勢時顯示 bat_attack */
+      e.stT-=dt;
+      if(e.state==='windup'){
+        if(e.stT<=0){e.state='charge';e.stT=.3;e.cx=ux*e.spd*3.2;e.cy=uy*e.spd*3.2;}
+        tx=0;ty=0;
+      }else if(e.state==='charge'){
+        tx=e.cx;ty=e.cy;
+        if(e.stT<=0){e.state='chase';e.stT=rand(2,3.5);}
+      }else{
+        const close=d<e.orb+60?1:.25;
+        const wob=Math.sin(G.time*1.7+e.ph)*22;
+        tx=(ux+pxv*e.sS*close)*e.spd+pxv*wob*.4;
+        ty=(uy+pyv*e.sS*close)*e.spd+pyv*wob*.4;
+        if(d<150&&e.stT<=0){e.state='windup';e.stT=.35;}
+      }
     }else{
       const close=d<e.orb+60?1:.25;
       const wob=Math.sin(G.time*1.7+e.ph)*22;
